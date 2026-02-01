@@ -2,28 +2,53 @@ import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
-from threading import Thread
 from flask import Flask
+from threading import Thread
+import time
 
+# ====== КОНФИГУРАЦИЯ ======
 TOKEN = os.getenv("TOKEN", "8525467586:AAFAmrbV-HMV36NOwOLLU3zKrT_UwnSg9X4")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "6333773120"))
 
-web_app = Flask(__name__)
+# Логирование
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-@web_app.route('/')
+print("=" * 50)
+print("🚀 iPhone Trade Bot запускается на Render...")
+print("=" * 50)
+
+# ====== FLASK ДЛЯ RENDER ======
+app = Flask(__name__)
+
+@app.route('/')
 def home():
-    return "🤖 iPhone Trade Bot работает на Render!"
+    return """
+    <html>
+        <head><title>🤖 iPhone Bot</title></head>
+        <body style="text-align: center; padding: 50px; background: #f0f0f0;">
+            <h1>🤖 iPhone Trade Bot</h1>
+            <p>✅ Бот работает на Render 24/7</p>
+            <p>📱 Telegram бот активен</p>
+            <p>🕒 Серверное время: """ + time.strftime('%H:%M:%S') + """</p>
+        </body>
+    </html>
+    """
 
-@web_app.route('/health')
+@app.route('/health')
 def health():
     return "OK", 200
 
-def run_web():
-    web_app.run(host='0.0.0.0', port=8080)
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
 
-print("🚀 iPhone Trade Bot запускается...")
-
+# ====== ТЕЛЕГРАМ БОТ ======
 async def start(update: Update, context: CallbackContext):
+    """Команда /start"""
     keyboard = [
         [KeyboardButton("📱 Каталог"), KeyboardButton("💰 Продать")],
         [KeyboardButton("🆘 Помощь"), KeyboardButton("📞 Контакты")]
@@ -31,28 +56,24 @@ async def start(update: Update, context: CallbackContext):
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     await update.message.reply_text(
-        "🤖 *Добро пожаловать в iPhone Trade Bot!*\n\nВыберите действие:",
+        "🤖 *Добро пожаловать в iPhone Trade Bot!*\n\n"
+        "Выберите действие:",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
+    print(f"✅ Пользователь {update.effective_user.username} запустил бота")
 
 async def catalog(update: Update, context: CallbackContext):
     await update.message.reply_text(
-        "📱 *В продаже:*\n\n• iPhone 13 Pro - 65 000₽\n• iPhone 12 - 45 000₽",
+        "📱 *Каталог:*\n\n• iPhone 13 Pro - 65 000₽\n• iPhone 12 - 45 000₽",
         parse_mode='Markdown'
     )
 
 async def sell(update: Update, context: CallbackContext):
     await update.message.reply_text(
-        "💰 *Продать iPhone:*\n\n1. Отправьте фото\n2. Укажите модель и цену",
+        "💰 *Продать iPhone:*\n\nОтправьте фото и описание",
         parse_mode='Markdown'
     )
-
-async def help_cmd(update: Update, context: CallbackContext):
-    await update.message.reply_text("🆘 Помощь: пишите вопросы!")
-
-async def contacts(update: Update, context: CallbackContext):
-    await update.message.reply_text("📞 Контакты: @ваш_канал")
 
 async def handle_text(update: Update, context: CallbackContext):
     text = update.message.text
@@ -62,28 +83,46 @@ async def handle_text(update: Update, context: CallbackContext):
     elif text == "💰 Продать":
         await sell(update, context)
     elif text == "🆘 Помощь":
-        await help_cmd(update, context)
+        await update.message.reply_text("Помощь: @ваш_канал")
     elif text == "📞 Контакты":
-        await contacts(update, context)
+        await update.message.reply_text("Контакты: +7 XXX XXX-XX-XX")
 
 async def handle_photo(update: Update, context: CallbackContext):
     user = update.effective_user
-    await update.message.reply_text(f"✅ Фото получено от @{user.username}!")
+    await update.message.reply_text(
+        f"✅ Фото получено, @{user.username}!\nОпишите модель и цену.",
+        parse_mode='Markdown'
+    )
 
-def run_bot():
+def run_telegram_bot():
+    """Запуск Telegram бота"""
     print("🤖 Запускаю Telegram бота...")
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("catalog", catalog))
-    app.add_handler(CommandHandler("help", help_cmd))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    
+    bot_app = Application.builder().token(TOKEN).build()
+    
+    # Обработчики
+    bot_app.add_handler(CommandHandler("start", start))
+    bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    bot_app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    
     print("✅ Telegram бот запущен!")
-    app.run_polling()
+    print("🌐 Веб-сервер работает")
+    
+    bot_app.run_polling()
 
+# ====== ГЛАВНЫЙ ЗАПУСК ======
 if name == "__main__":
-    web_thread = Thread(target=run_web, daemon=True)
-    web_thread.start()
-    import time
+    # Запускаем Flask в отдельном потоке
+    flask_thread = Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    
+    # Даем время Flask запуститься
     time.sleep(2)
-    run_bot()
+    
+    # Запускаем Telegram бота
+    try:
+        run_telegram_bot()
+    except Exception as e:
+        print(f"❌ Ошибка в боте: {e}")
+        print("🔁 Перезапуск через 5 секунд...")
+        time.sleep(5)
