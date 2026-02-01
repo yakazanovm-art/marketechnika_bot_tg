@@ -1,0 +1,14 @@
+Python 3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)] on win32
+Enter "help" below or click "Help" above for more information.
+>>> services:
+...   - type: web
+...     name: marketechnika_bot_tg
+...     runtime: python
+...     buildCommand: pip install -r requirements.txt
+...     startCommand: python main.py
+...     envVars:
+...       - key: TOKEN
+...         sync: false
+...       - key: ADMIN_ID
+...         sync: false
+...     healthCheckPath: /health
