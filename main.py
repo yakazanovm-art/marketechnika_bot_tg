@@ -1,85 +1,60 @@
-Python 3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)] on win32
-Enter "help" below or click "Help" above for more information.
-⭐ Состояние: Отличное
-💰 Цена: *65 000₽*
-📝 Батарея 92%, полная комплектация
+import os
+import logging
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+from threading import Thread
+from flask import Flask
 
-*2. iPhone 12 128GB*
-💾 Память: 128 ГБ
-🎨 Цвет: Черный
-⭐ Состояние: Хорошее
-💰 Цена: *45 000₽*
-📝 Мелкие царапины
+TOKEN = os.getenv("TOKEN", "8525467586:AAFAmrbV-HMV36NOwOLLU3zKrT_UwnSg9X4")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "6333773120"))
 
-*3. iPhone 14 Pro Max 512GB*
-💾 Память: 512 ГБ
-🎨 Цвет: Фиолетовый
-⭐ Состояние: Идеальное
-💰 Цена: *85 000₽*
-📝 Гарантия до 2025 года
+web_app = Flask(__name__)
 
-💬 *Для покупки напишите нам!*
-"""
-    await update.message.reply_text(catalog_text, parse_mode='Markdown')
+@web_app.route('/')
+def home():
+    return "🤖 iPhone Trade Bot работает на Render!"
+
+@web_app.route('/health')
+def health():
+    return "OK", 200
+
+def run_web():
+    web_app.run(host='0.0.0.0', port=8080)
+
+print("🚀 iPhone Trade Bot запускается...")
+
+async def start(update: Update, context: CallbackContext):
+    keyboard = [
+        [KeyboardButton("📱 Каталог"), KeyboardButton("💰 Продать")],
+        [KeyboardButton("🆘 Помощь"), KeyboardButton("📞 Контакты")]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    
+    await update.message.reply_text(
+        "🤖 *Добро пожаловать в iPhone Trade Bot!*\n\nВыберите действие:",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def catalog(update: Update, context: CallbackContext):
+    await update.message.reply_text(
+        "📱 *В продаже:*\n\n• iPhone 13 Pro - 65 000₽\n• iPhone 12 - 45 000₽",
+        parse_mode='Markdown'
+    )
 
 async def sell(update: Update, context: CallbackContext):
-    """Продажа"""
     await update.message.reply_text(
-        "💰 *Продать свой iPhone:*\n\n"
-        "Отправьте:\n"
-        "1. 📸 Фотографии (2-5 шт)\n"
-        "2. 📱 Модель и память\n"
-        "3. ⭐ Состояние\n"
-        "4. 💰 Желаемую цену\n\n"
-        "*Пример сообщения:*\n"
-        "iPhone 13 Pro, 256GB, отличное состояние, 60000₽",
+        "💰 *Продать iPhone:*\n\n1. Отправьте фото\n2. Укажите модель и цену",
         parse_mode='Markdown'
     )
 
 async def help_cmd(update: Update, context: CallbackContext):
-    """Помощь"""
-    help_text = """
-🆘 *Помощь по боту:*
-
-*Для покупателей:*
-1. Нажмите '📱 Каталог'
-2. Выберите модель
-3. Напишите нам для покупки
-
-*Для продавцов:*
-1. Нажмите '💰 Продать'
-2. Отправьте фото iPhone
-3. Опишите состояние
-4. Укажите цену
-
-*Команды:*
-/start - Главное меню
-/catalog - Каталог
-/help - Эта справка
-
-⏱ *Время ответа:* 5-15 минут
-"""
-    await update.message.reply_text(help_text, parse_mode='Markdown')
+    await update.message.reply_text("🆘 Помощь: пишите вопросы!")
 
 async def contacts(update: Update, context: CallbackContext):
-    """Контакты"""
-    contacts_text = """
-📞 *Наши контакты:*
-
-*Telegram канал:* @ваш_канал
-*Телефон:* +7 (XXX) XXX-XX-XX
-*Email:* iphone@example.com
-
-*Режим работы:*
-Пн-Пт: 10:00-20:00
-Сб-Вс: 11:00-18:00
-
-📍 Москва, встреча по записи
-"""
-    await update.message.reply_text(contacts_text, parse_mode='Markdown')
+    await update.message.reply_text("📞 Контакты: @ваш_канал")
 
 async def handle_text(update: Update, context: CallbackContext):
-    """Обработка текста"""
     text = update.message.text
     
     if text == "📱 Каталог":
@@ -90,48 +65,25 @@ async def handle_text(update: Update, context: CallbackContext):
         await help_cmd(update, context)
     elif text == "📞 Контакты":
         await contacts(update, context)
-    else:
-        await update.message.reply_text("Используйте кнопки меню! 😊")
 
 async def handle_photo(update: Update, context: CallbackContext):
-    """Обработка фото"""
     user = update.effective_user
-    await update.message.reply_text(
-...         f"✅ *Фото получено!*\n\n"
-...         f"Спасибо, @{user.username}!\n"
-...         f"Теперь опишите ваш iPhone:\n\n"
-...         f"1. Модель\n"
-...         f"2. Память\n"
-...         f"3. Состояние\n"
-...         f"4. Цена\n\n"
-...         f"*Пример:* iPhone 13 Pro, 256GB, отличное, 60000₽",
-...         parse_mode='Markdown'
-...     )
-... 
-... def run_bot():
-...     """Запуск Telegram бота"""
-...     print("🤖 Запускаю Telegram бота...")
-...     
-...     app = Application.builder().token(TOKEN).build()
-...     
-...     app.add_handler(CommandHandler("start", start))
-...     app.add_handler(CommandHandler("catalog", catalog))
-...     app.add_handler(CommandHandler("help", help_cmd))
-...     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-...     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-...     
-...     print("✅ Telegram бот запущен!")
-...     print("🌐 Веб-сервер работает на порту 8080")
-...     
-...     app.run_polling()
-... 
-... if name == "__main__":
-...     # Запускаем веб-сервер в отдельном потоке
-...     web_thread = Thread(target=run_web, daemon=True)
-...     web_thread.start()
-...     
-...     # Даем время веб-серверу запуститься
-...     import time
-...     time.sleep(2)
-...     
-...     # Запускаем бота
+    await update.message.reply_text(f"✅ Фото получено от @{user.username}!")
+
+def run_bot():
+    print("🤖 Запускаю Telegram бота...")
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("catalog", catalog))
+    app.add_handler(CommandHandler("help", help_cmd))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    print("✅ Telegram бот запущен!")
+    app.run_polling()
+
+if name == "__main__":
+    web_thread = Thread(target=run_web, daemon=True)
+    web_thread.start()
+    import time
+    time.sleep(2)
+    run_bot()
