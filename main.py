@@ -1,24 +1,20 @@
 import json
-import asyncio
 import os
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
-from aiogram.fsm.state import StatesGroup, State
-from aiogram.fsm.context import FSMContext
+from aiogram import Bot, Dispatcher, executor, types
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
 
-TOKEN = os.getenv("8525467586:AAFAmrbV-HMV36NOwOLLU3zKrT_UwnSg9X4")
-ADMIN_ID = int(os.getenv("6333773120"))
+TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 bot = Bot(TOKEN)
-dp = Dispatcher()
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
 
-keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="📱 Доступные айфоны")],
-        [KeyboardButton(text="💰 Продать айфон")]
-    ],
-    resize_keyboard=True
-)
+keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+keyboard.add("📱 Доступные айфоны")
+keyboard.add("💰 Продать айфон")
 
 class SellForm(StatesGroup):
     model = State()
@@ -27,12 +23,12 @@ class SellForm(StatesGroup):
     price = State()
     photo = State()
 
-@dp.message(F.text == "/start")
-async def start(message: Message):
+@dp.message_handler(commands=['start'])
+async def start(message: types.Message):
     await message.answer("Привет! Выбери действие:", reply_markup=keyboard)
 
-@dp.message(F.text == "📱 Доступные айфоны")
-async def show_phones(message: Message):
+@dp.message_handler(text="📱 Доступные айфоны")
+async def phones(message: types.Message):
     with open("phones.json") as f:
         phones = json.load(f)
 
@@ -43,59 +39,52 @@ async def show_phones(message: Message):
 
     await message.answer(text)
 
-@dp.message(F.text == "💰 Продать айфон")
-async def sell_start(message: Message, state: FSMContext):
-    await state.set_state(SellForm.model)
-    await message.answer("Напиши модель айфона:")
+@dp.message_handler(text="💰 Продать айфон")
+async def sell(message: types.Message):
+    await SellForm.model.set()
+    await message.answer("Модель айфона:")
 
-@dp.message(SellForm.model)
-async def model(message: Message, state: FSMContext):
+@dp.message_handler(state=SellForm.model)
+async def model(message: types.Message, state: FSMContext):
     await state.update_data(model=message.text)
-    await state.set_state(SellForm.memory)
-    await message.answer("Память (например 128GB):")
+    await SellForm.memory.set()
+    await message.answer("Память:")
 
-@dp.message(SellForm.memory)
-async def memory(message: Message, state: FSMContext):
+@dp.message_handler(state=SellForm.memory)
+async def memory(message: types.Message, state: FSMContext):
     await state.update_data(memory=message.text)
-    await state.set_state(SellForm.condition)
+    await SellForm.condition.set()
     await message.answer("Состояние:")
 
-@dp.message(SellForm.condition)
-async def condition(message: Message, state: FSMContext):
+@dp.message_handler(state=SellForm.condition)
+async def condition(message: types.Message, state: FSMContext):
     await state.update_data(condition=message.text)
-    await state.set_state(SellForm.price)
-    await message.answer("Желаемая цена:")
+    await SellForm.price.set()
+    await message.answer("Цена:")
 
-@dp.message(SellForm.price)
-async def price(message: Message, state: FSMContext):
+@dp.message_handler(state=SellForm.price)
+async def price(message: types.Message, state: FSMContext):
     await state.update_data(price=message.text)
-    await state.set_state(SellForm.photo)
-    await message.answer("Теперь пришли фото:")
+    await SellForm.photo.set()
+    await message.answer("Пришли фото:")
 
-@dp.message(SellForm.photo, F.photo)
-async def photo(message: Message, state: FSMContext):
+@dp.message_handler(content_types=types.ContentType.PHOTO, state=SellForm.photo)
+async def photo(message: types.Message, state: FSMContext):
     data = await state.get_data()
 
-    caption = (
-        f"🔥 Новая заявка\n\n"
-        f"Модель: {data['model']}\n"
-        f"Память: {data['memory']}\n"
-        f"Состояние: {data['condition']}\n"
-        f"Цена: {data['price']}\n"
-        f"От: @{message.from_user.username}"
-    )
+    caption = f"""
+🔥 Новая заявка
 
-    await bot.send_photo(
-        ADMIN_ID,
-        message.photo[-1].file_id,
-        caption=caption
-    )
+Модель: {data['model']}
+Память: {data['memory']}
+Состояние: {data['condition']}
+Цена: {data['price']}
+"""
 
-    await message.answer("✅ Заявка отправлена!")
-    await state.clear()
+    await bot.send_photo(ADMIN_ID, message.photo[-1].file_id, caption=caption)
 
-async def main():
-    await dp.start_polling(bot)
+    await message.answer("✅ Отправлено!")
+    await state.finish()
 
 if name == "__main__":
-    asyncio.run(main())
+    executor.start_polling(dp)
